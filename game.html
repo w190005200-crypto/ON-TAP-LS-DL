@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>FPS - Balance Update V13</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #050510; font-family: 'Segoe UI', Tahoma, sans-serif; user-select: none; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; color: white; text-shadow: 0 0 5px #00ffff; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px #00ffff; }
+        
+        .hud-box { background: rgba(5, 5, 15, 0.85); padding: 15px; border-radius: 5px; border: 1px solid #00ffff; display: inline-block; margin-bottom: 10px; box-shadow: 0 0 15px rgba(0,255,255,0.3); border-left: 5px solid #ff00ff; }
+        #health-bar { width: 350px; height: 25px; background: #111; border: 2px solid #ff00ff; margin-bottom: 10px; border-radius: 3px; position: relative; overflow: hidden; box-shadow: 0 0 10px #ff00ff; }
+        #health-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff0055, #00ffff); transition: width 0.1s linear; }
+        #hp-text { position: absolute; top: 2px; left: 15px; font-weight: 900; font-size: 16px; letter-spacing: 2px; }
+        #hurt-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 40%, rgba(255,0,0,0.6) 100%); opacity: 0; pointer-events: none; transition: 0.1s; }
+        .controls { font-size: 13px; color: #aaa; margin-top: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px; display: inline-block; border: 1px solid #333; }
+        .highlight { color: #00ffff; font-weight: bold; }
+        
+        .exam-tracker { position: absolute; top: 20px; right: 20px; background: rgba(5,5,15,0.9); padding: 15px; border: 2px solid #ff00ff; border-radius: 8px; text-align: right; box-shadow: 0 0 15px #ff00ff; }
+        .exam-stat { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+        
+        #gacha-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(5,5,15,0.95); padding: 40px; border: 2px solid #00ffff; border-radius: 10px; text-align: center; display: none; pointer-events: auto; box-shadow: 0 0 40px #00ffff; z-index: 50;}
+        button { padding: 12px 30px; background: transparent; color: #00ffff; border: 2px solid #00ffff; font-weight: 900; cursor: pointer; text-transform: uppercase; font-size: 16px; border-radius: 5px; transition: 0.2s; margin: 5px; text-shadow: 0 0 5px #00ffff; }
+        button:hover { background: #00ffff; color: #000; box-shadow: 0 0 20px #00ffff; }
+        
+        #warning-msg { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); color: #ffaa00; font-size: 35px; font-weight: 900; font-family: 'Impact', sans-serif; text-shadow: 2px 2px 0px #000; opacity: 0; transition: opacity 0.5s ease-out; pointer-events: none; z-index: 100; display: none;}
+
+        #quiz-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,5,20,0.98); display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; pointer-events: auto; z-index: 200; }
+        #quiz-ui h1 { color: #ff00ff; font-size: 40px; font-family: 'Impact', sans-serif; text-shadow: 0 0 15px #ff00ff; margin-bottom: 5px; }
+        #quiz-question { font-size: 22px; max-width: 800px; margin-bottom: 25px; color: #fff; line-height: 1.5; font-weight: bold; text-shadow: none;}
+        #quiz-options { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 700px; }
+        .quiz-btn { background: rgba(255,0,255,0.05); color: #fff; border: 1px solid #ff00ff; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; text-align: left; text-shadow: none;}
+        .quiz-btn:hover { background: #ff00ff; color: #000; box-shadow: 0 0 15px #ff00ff; }
+
+        #summary-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; pointer-events: auto; z-index: 400; }
+        #summary-ui h1 { font-size: 80px; color: #00ffff; text-shadow: 0 0 30px #00ffff; margin-bottom: 20px; font-family: 'Impact';}
+        .sum-box { border: 2px solid #ff00ff; padding: 30px; border-radius: 10px; background: rgba(255,0,255,0.1); font-size: 24px; margin-bottom: 30px; box-shadow: 0 0 20px #ff00ff;}
+
+        #game-over { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(20,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; color: #ff0055; text-align: center; pointer-events: none; z-index: 300; }
+        #game-over h1 { font-size: 100px; margin: 0; font-family: 'Impact', sans-serif; text-shadow: 0 0 30px #ff0055; letter-spacing: 5px; }
+    </style>
+</head>
+<body>
+    <div id="hurt-overlay"></div>
+    <div id="warning-msg">NOT ENOUGH DATA</div>
+    
+    <div id="ui">
+        <div id="health-bar"><div id="health-fill"></div><div id="hp-text">100 / 100</div></div>
+        <div class="hud-box">
+            <h2 style="margin:0 0 5px 0;">DATA: <span id="points" style="color:#00ffff;">0</span></h2>
+            <div style="font-size: 16px;">WEAPON: <span id="weapon-text" style="color: #ff00ff; font-weight: bold;">LASER SWORD (1)</span></div>
+            <div style="font-size: 16px;">SKILL: <span id="skill-text" style="color: #00ffff; font-weight: bold;">NONE (Press G)</span></div>
+        </div>
+        <br>
+        <div class="controls">
+            [WASD] Move | [SPACE] Jump | [Click] Attack | [Q] Dash<br>
+            <span class="highlight">[E] Skill (HOLD E for Laser Beam)</span> | [1/2] Switch
+        </div>
+        
+        <div class="exam-tracker">
+            <div class="exam-stat" style="color: #ff00ff;">GIẾT QUÁI ĐỂ MỞ CÂU HỎI</div>
+            <div class="exam-stat" style="color: #fff;">Đã diệt: <span id="quiz-progress" style="color: #00ffff;">0/15</span></div>
+            <hr style="border-color: #555;">
+            <div class="exam-stat" style="color: #00ff00;">Đúng: <span id="correct-cnt">0</span></div>
+            <div class="exam-stat" style="color: #ff0055;">Sai: <span id="wrong-cnt">0</span></div>
+            <div class="exam-stat" style="color: #aaa; font-size: 14px;">Tiến độ: <span id="question-cnt">0</span>/20</div>
+        </div>
+    </div>
+    <div id="crosshair"></div>
+    
+    <div id="gacha-ui">
+        <h2 style="color: white; margin-top:0;">SYSTEM UPLOAD (100 DATA)</h2>
+        <h1 id="gacha-result" style="color: #00ffff; font-size: 45px;">...</h1>
+        <button onclick="closeGacha()">ACCEPT</button>
+    </div>
+
+    <div id="quiz-ui">
+        <h1>BÀI KIỂM TRA (#<span id="q-num">1</span>)</h1>
+        <div id="quiz-question">Đang tải...</div>
+        <div id="quiz-options"></div>
+    </div>
+
+    <div id="summary-ui">
+        <h1>HOÀN THÀNH CHƯƠNG TRÌNH</h1>
+        <div class="sum-box">
+            <div style="color: #00ff00; margin-bottom: 10px;">Số câu Đúng: <span id="sum-correct">0</span>/20</div>
+            <div style="color: #ff0055; margin-bottom: 10px;">Số câu Sai: <span id="sum-wrong">0</span>/20</div>
+            <div style="color: #00ffff;">Thời gian: <span id="sum-time">0m 0s</span></div>
+        </div>
+        <button onclick="location.reload()">CHƠI LẠI TỪ ĐẦU</button>
+    </div>
+
+    <div id="game-over">
+        <h1>YOU DIED</h1>
+        <h2 style="color:white;">ĐIỂM VÀ TIẾN ĐỘ BÀI THI ĐƯỢC GIỮ NGUYÊN.</h2>
+        <h2 style="color:#00ffff; font-size: 20px;">PRESS [R] TO RESPAWN</h2>
+    </div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // Bộ 20 câu hỏi (Chỉ A,B,C,D chuẩn)
+        const quizBank = [
+            { q: "1. Vị vua đã có công thống nhất các bộ tộc Lào, lập ra vương quốc Lan Xang là ai?", options: ["A. Xu-li-nha Vông-xa", "B. Pha Ngừm", "C. Giay-a-vác-man II", "D. Chậu A Nụ"], answer: 1 },
+            { q: "2. Trước khi vương quốc Lan Xang ra đời, trên lãnh thổ có những tộc người nào sinh sống?", options: ["A. Người Lào Thơng, người Khơ-me.", "B. Người Lào Thơng, người Lào Lùm.", "C. người Thái, người Lào Lùm.", "D. người Khơ-me, người Thái."], answer: 0 },
+            { q: "3. Người đã có công dẹp loạn 12 sứ quân, thống nhất đất nước là ai?", options: ["A. Đinh Bộ Lĩnh", "B. Lê Hoàn", "C. Ngô Quyền", "D. Lý Công Uẩn"], answer: 0 },
+            { q: "4. Tầng lớp giữ địa vị thống trị trong xã hội thời Ngô - Đinh - Tiền Lê là?", options: ["A. địa chủ và nông dân tự canh.", "B. nông dân lĩnh canh và thợ thủ công.", "C. quan lại và một bộ phận nhà sư, đạo sĩ.", "D. vua, quan và một bộ phận nhà sư, đạo sĩ."], answer: 3 },
+            { q: "5. Thập đạo tướng quân Lê Hoàn lên ngôi vua trong hoàn cảnh như thế nào?", options: ["A. Đất nước đang trong tình trạng phân liệt", "B. Đất nước thanh bình, thịnh trị", "C. Nhà Tống hoàn thành xâm lược", "D. Nhà Đinh suy yếu, vua còn nhỏ, quân Tống lăm le xâm lược."], answer: 3 },
+            { q: "6. Sau khi đánh bại quân Nam Hán, Ngô Quyền đã làm gì?", options: ["A. lên ngôi hoàng đế, lập ra nhà nước Đại Cồ Việt.", "B. lên ngôi vua, bãi bỏ chức Tiết độ sứ.", "C. lên ngôi vua, đóng đô ở vùng cửa sông Tô Lịch.", "D. chọn Hoa Lư làm kinh đô của đất nước."], answer: 1 },
+            { q: "7. Vị vua đầu tiên của vương triều Lý là ai?", options: ["A. Lý Thái Tổ", "B. Lý Thái Tông", "C. Lý Thánh Tông", "D. Lý Nhân Tông"], answer: 0 },
+            { q: "8. Bộ luật thành văn đầu tiên của nước ta là gì?", options: ["A. Quốc triều hình luật", "B. Hoàng triều luật lệ", "C. Hình luật", "D. Hình thư"], answer: 3 },
+            { q: "9. Hằng năm, các vua nhà Lý thực hiện lễ cày ruộng tịch điền để làm gì?", options: ["A. thúc đẩy sự phát triển thủ công nghiệp.", "B. khuyến khích nhân dân sản xuất nông nghiệp.", "C. củng cố quyền lực của chính quyền trung ương.", "D. thể hiện uy quyền và tài năng trị quốc."], answer: 1 },
+            { q: "10. Vương triều Lý thực hiện chính sách đối ngoại như thế nào?", options: ["A. Bế quan tỏa cảng", "B. Lệ thuộc phong kiến phương Bắc", "C. Tuyệt đối không giao thiệp", "D. Hòa hiếu với láng giềng nhưng kiên quyết đáp trả xâm lược."], answer: 3 },
+            { q: "11. Người dân châu Phi ở vùng ven sa mạc đã làm gì để ngăn chặn hiện tượng sa mạc hóa?", options: ["A. Tham gia dự án trồng rừng.", "B. Trồng cây ăn quả.", "C. Trồng cây công nghiệp.", "D. Phát triển du lịch kết hợp thủy lợi."], answer: 0 },
+            { q: "12. Đâu là những khó khăn mà người dân châu Phi gặp phải khi khai thác thiên nhiên nhiệt đới?", options: ["A. Khí hậu khô hạn và sinh vật nghèo nàn", "B. Thoái hóa đất và nguồn nước hạn chế", "C. Cây ăn quả và cây công nghiệp kém phát triển", "D. Khai thác dầu mỏ và khí đốt"], answer: 1 },
+            { q: "13. Sau khi tìm ra châu Mỹ, người da đen châu Phi đã nhập cư vào châu Mỹ thông qua con đường nào?", options: ["A. Sang xâm chiếm thuộc địa.", "B. Bị đưa sang làm nô lệ.", "C. Sang buôn bán.", "D. Đi thăm quan du lịch."], answer: 1 },
+            { q: "14. Nguyên nhân nào góp phần làm đa dạng bản sắc văn hóa của châu Mỹ như ngày nay?", options: ["A. Hoạt động khai thác tài nguyên, thương mại, truyền giáo.", "B. Hoạt động khai thác tài nguyên.", "C. Người châu Á đến châu Mỹ tìm cơ hội mới.", "D. Có lực lượng lao động da đen đông, tiền công rẻ."], answer: 0 },
+            { q: "15. Châu Mỹ không tiếp giáp với đại dương nào sau đây?", options: ["A. Bắc Băng Dương.", "B. Đại Tây Dương.", "C. Ấn Độ Dương.", "D. Thái Bình Dương."], answer: 2 },
+            { q: "16. Dãy núi cao đồ sộ nhất Bắc Mỹ là dãy núi nào sau đây?", options: ["A. Cooc-di-e.", "B. Atlat.", "C. Apalat.", "D. Andet."], answer: 0 },
+            { q: "17. Miền núi thấp và trung bình ở phía đông Bắc Mỹ bao gồm dãy núi nào?", options: ["A. Dãy núi già A-pa-lát và cao nguyên La-bra-đo.", "B. Đồng bằng Lớn.", "C. Hệ thống núi Cooc-đi-e.", "D. Đồng bằng trung tâm."], answer: 0 },
+            { q: "18. Địa hình Bắc Mỹ theo thứ tự từ Đông sang Tây, lần lượt gồm:", options: ["A. Núi trẻ, núi cổ, đồng bằng lớn.", "B. Núi cổ, đồng bằng lớn, núi trẻ.", "C. Đồng bằng lớn, núi trẻ, núi cổ.", "D. Núi trẻ, đồng bằng lớn, núi cổ."], answer: 1 },
+            { q: "19. Việc khai thác quá mức nguồn tài nguyên nước cùng với lượng chất thải lớn đã gây ra hậu quả nào?", options: ["A. Thoái hóa đất.", "B. Ô nhiễm nguồn nước.", "C. Ô nhiễm không khí.", "D. Biến đổi khí hậu."], answer: 1 },
+            { q: "20. Biện pháp nào đang được áp dụng để bảo vệ rừng ở Bắc Mỹ?", options: ["A. Chặt phá rừng tự do.", "B. Quy định chặt chẽ về khai thác và trồng lại rừng.", "C. Chỉ phát triển rừng thông.", "D. Thay thế gỗ bằng nhựa công nghiệp."], answer: 1 }
+        ];
+
+        // --- Âm thanh êm ái (Sóng Sine) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSnd(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            let n = audioCtx.currentTime;
+            if(type === 'slash') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(600, n); osc.frequency.exponentialRampToValueAtTime(200, n + 0.15);
+                gain.gain.setValueAtTime(0.3, n); gain.gain.exponentialRampToValueAtTime(0.01, n + 0.15); osc.start(n); osc.stop(n + 0.15);
+            } else if(type === 'shoot') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(1000, n); osc.frequency.exponentialRampToValueAtTime(300, n + 0.1);
+                gain.gain.setValueAtTime(0.2, n); gain.gain.exponentialRampToValueAtTime(0.01, n + 0.1); osc.start(n); osc.stop(n + 0.1);
+            } else if(type === 'correct') { 
+                osc.type = 'sine'; osc.frequency.setValueAtTime(600, n); osc.frequency.setValueAtTime(900, n + 0.1);
+                gain.gain.setValueAtTime(0.5, n); gain.gain.exponentialRampToValueAtTime(0.01, n + 0.4); osc.start(n); osc.stop(n + 0.4);
+            } else if(type === 'wrong') { 
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(200, n); osc.frequency.linearRampToValueAtTime(150, n + 0.3);
+                gain.gain.setValueAtTime(0.3, n); gain.gain.linearRampToValueAtTime(0.01, n + 0.3); osc.start(n); osc.stop(n + 0.3);
+            } else if(type === 'beam') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(200, n); osc.frequency.linearRampToValueAtTime(150, n + 0.1);
+                gain.gain.setValueAtTime(0.1, n); gain.gain.linearRampToValueAtTime(0.01, n + 0.1); osc.start(n); osc.stop(n + 0.1);
+            } else if(type === 'enemyShoot') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(400, n); osc.frequency.exponentialRampToValueAtTime(800, n + 0.15);
+                gain.gain.setValueAtTime(0.1, n); gain.gain.exponentialRampToValueAtTime(0.01, n + 0.15); osc.start(n); osc.stop(n + 0.15);
+            }
+        }
+
+        let scene, camera, renderer, clock;
+        const MAX_HP = 100;
+        let points = 0, playerHP = MAX_HP, isDead = false, isQuizMode = false, isGameFinished = false;
+        
+        let killsSinceLastQuiz = 0, questionsAnswered = 0;
+        let correctCnt = 0, wrongCnt = 0, gameStartTime = 0;
+        let isGachaOpen = false, pendingQuiz = false;
+
+        let objects = [], enemies = [], boundingBoxes = [], activeVFX = [], enemyProjectiles = [];
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let canJump = false, isDashing = false;
+        let velocity = new THREE.Vector3();
+        
+        let yaw = 0, pitch = 0;
+        const MOUSE_SENSITIVITY = 0.0015;
+        let isLocked = false, attackTimer = 0;
+        
+        let weaponState = 1, currentSkill = 0; 
+        let playerSword, slashTrail, playerGun, laserBeamGroup;
+        let isHoldingLaser = false; 
+        const RAYCASTER = new THREE.Raycaster();
+
+        init(); animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050510);
+            scene.fog = new THREE.FogExp2(0x050510, 0.015);
+
+            camera = new THREE.PerspectiveCamera(85, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.rotation.order = 'YXZ';
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            document.body.addEventListener('click', () => { 
+                if (!isDead && !isQuizMode && !isGameFinished && !isGachaOpen) document.body.requestPointerLock(); 
+            });
+            document.addEventListener('pointerlockchange', () => { isLocked = document.pointerLockElement === document.body; });
+            document.addEventListener('mousemove', (e) => {
+                if (isLocked) {
+                    yaw -= e.movementX * MOUSE_SENSITIVITY; pitch -= e.movementY * MOUSE_SENSITIVITY;
+                    pitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, pitch));
+                    camera.rotation.set(pitch, yaw, 0);
+                }
+            });
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+            createNeonMap(); setupWeapons();
+            for(let i=0; i<15; i++) spawnCyberEnemy(); 
+
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousedown', (e) => { if(isLocked && e.button === 0 && !isDead && !isHoldingLaser) performAttack(); });
+            window.addEventListener('resize', onWindowResize);
+
+            clock = new THREE.Clock(); gameStartTime = clock.getElapsedTime();
+            camera.position.set(0, 5, 0); 
+        }
+
+        function createNeonMap() {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = '#050510'; ctx.fillRect(0,0,512,512);
+            ctx.strokeStyle = '#ff00ff'; ctx.lineWidth = 2; 
+            for(let i=0; i<=512; i+=64) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,512); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(512,i); ctx.stroke(); }
+            const texture = new THREE.CanvasTexture(canvas); texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(40, 40);
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({ map: texture }));
+            floor.rotation.x = -Math.PI / 2; scene.add(floor);
+
+            for(let i=0; i<45; i++) {
+                const w = Math.random()*8+2, h = Math.random()*20+5, d = Math.random()*8+2;
+                const geo = new THREE.BoxGeometry(w, h, d);
+                const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color: 0x0a0a1a}));
+                const edges = new THREE.EdgesGeometry(geo);
+                const lineColor = Math.random() > 0.5 ? 0x00ffff : 0xff00ff;
+                mesh.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color: lineColor, linewidth: 2})));
+                mesh.position.set(Math.random()*200-100, h/2, Math.random()*200-100);
+                scene.add(mesh); mesh.updateMatrixWorld(); boundingBoxes.push(new THREE.Box3().setFromObject(mesh));
+            }
+        }
+
+        function setupWeapons() {
+            playerSword = new THREE.Group();
+            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 8), new THREE.MeshBasicMaterial({color: 0x333333})); handle.position.set(0, -0.2, 0);
+            const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.8), new THREE.MeshBasicMaterial({color: 0xffffff})); blade.position.set(0, 0.9, 0);
+            const bladeGlow = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.8), new THREE.MeshBasicMaterial({color: 0xff00ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending})); bladeGlow.position.set(0, 0.9, 0);
+            playerSword.add(handle, blade, bladeGlow);
+            playerSword.position.set(0.6, -0.4, -0.7);
+            camera.add(playerSword);
+
+            slashTrail = new THREE.Group(); 
+            const slashMesh = new THREE.Mesh(
+                new THREE.TorusGeometry(3.5, 0.05, 8, 32, Math.PI), 
+                new THREE.MeshBasicMaterial({color: 0xff00ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending})
+            );
+            slashMesh.rotation.set(Math.PI/2, 0, 0); 
+            slashTrail.add(slashMesh); slashTrail.position.set(0, 0, -3.5); 
+            camera.add(slashTrail);
+
+            // NEON PISTOL (TAY TRÁI)
+            playerGun = new THREE.Group();
+            const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.4), new THREE.MeshBasicMaterial({color: 0x111111}));
+            const gunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5), new THREE.MeshBasicMaterial({color: 0x333333})); gunBarrel.rotation.x = Math.PI/2; gunBarrel.position.set(0, 0, -0.3);
+            const neonLine = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.02, 0.4), new THREE.MeshBasicMaterial({color: 0x00ffff})); neonLine.position.y = 0.02;
+            const gunHandle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.2, 0.1), new THREE.MeshBasicMaterial({color: 0x222222})); gunHandle.position.set(0, -0.15, 0.1); gunHandle.rotation.x = 0.2;
+            playerGun.add(gunBody, gunBarrel, neonLine, gunHandle);
+            playerGun.position.set(-0.5, -0.3, -0.6); playerGun.visible = false;
+            camera.add(playerGun);
+
+            // FINAL SPARK BEAM (Chỉnh lại hiệu ứng nhỏ gọn hơn để nhìn xuyên qua, và đổi màu xanh dương hợp với súng)
+            laserBeamGroup = new THREE.Group();
+            const laserBeamCore = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 300, 16), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending})); laserBeamCore.rotation.x = -Math.PI/2; laserBeamCore.position.z = -150; 
+            const beamAura = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 300, 16), new THREE.MeshBasicMaterial({color: 0x00ffff, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending})); beamAura.rotation.x = -Math.PI/2; beamAura.position.z = -150;
+            laserBeamGroup.add(laserBeamCore, beamAura);
+            
+            // Gắn vào nòng súng
+            laserBeamGroup.position.set(0, 0, -0.5); 
+            laserBeamGroup.visible = false; 
+            playerGun.add(laserBeamGroup);
+
+            scene.add(camera);
+        }
+
+        // SPAWN KẺ ĐỊCH XA NGƯỜI CHƠI NHẤT CÓ THỂ
+        function spawnCyberEnemy() {
+            const group = new THREE.Group();
+            const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), new THREE.MeshBasicMaterial({color: 0x111111}));
+            const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0, 0), new THREE.MeshBasicMaterial({color: 0xff0055, wireframe: true}));
+            group.add(core, wire);
+            
+            // GIẢI THUẬT: KHÔNG SPAWN TRÊN ĐẦU
+            let spawnX, spawnZ;
+            do {
+                spawnX = Math.random()*200-100;
+                spawnZ = Math.random()*200-100;
+            } while(Math.hypot(spawnX - camera.position.x, spawnZ - camera.position.z) < 30); // Cách xa ít nhất 30 mét
+            
+            group.position.set(spawnX, 2, spawnZ); 
+            // NERF SPEED XUỐNG MỘT NỬA
+            group.userData = { hp: 50, speed: 3 + Math.random()*2, lastAttack: 0, rotSpeed: Math.random()*0.05 };
+            scene.add(group); enemies.push(group);
+        }
+
+        function fireEnemyProjectile(enemy) {
+            playSnd('enemyShoot');
+            const ball = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({color: 0xff0055}));
+            ball.position.copy(enemy.position);
+            const dir = new THREE.Vector3().subVectors(camera.position, ball.position).normalize();
+            scene.add(ball);
+            enemyProjectiles.push({ mesh: ball, dir: dir, speed: 20, age: 0 });
+        }
+
+        function updateHPBar() {
+            document.getElementById('health-fill').style.width = Math.max(0, (playerHP/MAX_HP)*100) + '%';
+            document.getElementById('hp-text').innerText = Math.max(0, playerHP) + " / " + MAX_HP;
+        }
+
+        function triggerQuiz() {
+            if (questionsAnswered >= 20) return; 
+            isQuizMode = true; document.exitPointerLock();
+            
+            const qObj = quizBank[questionsAnswered]; 
+            document.getElementById('q-num').innerText = questionsAnswered + 1;
+            document.getElementById('quiz-question').innerText = qObj.q;
+            const optionsDiv = document.getElementById('quiz-options'); optionsDiv.innerHTML = '';
+            
+            qObj.options.forEach((opt, index) => {
+                const btn = document.createElement('button'); btn.className = 'quiz-btn'; btn.innerText = opt;
+                btn.onclick = () => processAnswer(index, qObj.answer); 
+                optionsDiv.appendChild(btn);
+            });
+            document.getElementById('quiz-ui').style.display = 'flex';
+        }
+
+        window.processAnswer = (selectedIndex, correctIndex) => {
+            if(selectedIndex === correctIndex) { playSnd('correct'); correctCnt++; document.getElementById('correct-cnt').innerText = correctCnt; } 
+            else { playSnd('wrong'); wrongCnt++; document.getElementById('wrong-cnt').innerText = wrongCnt; }
+            
+            questionsAnswered++; document.getElementById('question-cnt').innerText = questionsAnswered;
+            document.getElementById('quiz-ui').style.display = 'none';
+            
+            if (questionsAnswered >= 20) showEndGameSummary();
+            else { isQuizMode = false; document.body.requestPointerLock(); }
+        };
+
+        function showEndGameSummary() {
+            isGameFinished = true; document.exitPointerLock();
+            const timeTaken = Math.floor(clock.getElapsedTime() - gameStartTime);
+            document.getElementById('sum-correct').innerText = correctCnt;
+            document.getElementById('sum-wrong').innerText = wrongCnt;
+            document.getElementById('sum-time').innerText = `${Math.floor(timeTaken / 60)} phút ${timeTaken % 60} giây`;
+            document.getElementById('summary-ui').style.display = 'flex';
+        }
+
+        function onKeyDown(event) {
+            if (isDead) { if (event.code === 'KeyR' && !isQuizMode && !isGameFinished) { 
+                isDead = false; playerHP = MAX_HP; updateHPBar();
+                document.getElementById('game-over').style.display = 'none';
+                camera.position.set(0, 5, 0); velocity.set(0,0,0); document.body.requestPointerLock();
+            } return; }
+
+            if (isQuizMode || isGameFinished || isGachaOpen) return;
+
+            switch(event.code) {
+                case 'KeyW': moveForward = true; break; case 'KeyA': moveLeft = true; break;
+                case 'KeyS': moveBackward = true; break; case 'KeyD': moveRight = true; break;
+                case 'Space': if(canJump) { velocity.y += 120; canJump = false; } break;
+                case 'Digit1': switchWeapon(1); break; case 'Digit2': switchWeapon(2); break;
+                case 'KeyQ': performDash(); break;
+                case 'KeyE': 
+                    if(currentSkill === 3 && !isHoldingLaser) {
+                        isHoldingLaser = true; playerSword.visible = false; playerGun.visible = true; laserBeamGroup.visible = true;
+                    } else if (currentSkill !== 3) { useSkill(); }
+                    break;
+                case 'KeyG': rollGacha(); break;
+            }
+        }
+        
+        function onKeyUp(event) {
+            switch(event.code) {
+                case 'KeyW': moveForward = false; break; case 'KeyA': moveLeft = false; break;
+                case 'KeyS': moveBackward = false; break; case 'KeyD': moveRight = false; break;
+                case 'KeyE': 
+                    if(isHoldingLaser) {
+                        isHoldingLaser = false; laserBeamGroup.visible = false;
+                        currentSkill = 0; document.getElementById('skill-text').innerText = "NONE";
+                        switchWeapon(weaponState);
+                    }
+                    break;
+            }
+        }
+
+        function switchWeapon(type) {
+            weaponState = type; playerSword.visible = (type === 1); playerGun.visible = (type === 2);
+            document.getElementById('weapon-text').innerText = type === 1 ? "LASER SWORD (1)" : "NEON PISTOL (2)";
+            document.getElementById('weapon-text').style.color = type === 1 ? "#ff00ff" : "#00ffff";
+        }
+
+        function performDash() {
+            if(isDashing) return; isDashing = true;
+            const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize();
+            velocity.x += dir.x * 250; velocity.z += dir.z * 250;
+            camera.fov = 105; camera.updateProjectionMatrix();
+            setTimeout(() => { camera.fov = 85; camera.updateProjectionMatrix(); isDashing = false; }, 200);
+        }
+
+        function performAttack() {
+            if(attackTimer > 0) return;
+            attackTimer = 0.4; 
+
+            if(weaponState === 1) { 
+                playSnd('slash');
+                playerSword.rotation.set(0, -Math.PI/2, -Math.PI/4); playerSword.position.x = -0.6; 
+                slashTrail.children[0].material.opacity = 1; slashTrail.scale.set(0.1, 0.1, 0.1);
+                enemies.forEach(enemy => { if(Math.hypot(camera.position.x - enemy.position.x, camera.position.z - enemy.position.z) < 7 && Math.abs(camera.position.y - enemy.position.y) < 5) damageEnemy(enemy, 250); });
+            } else if (weaponState === 2) { 
+                playSnd('shoot');
+                
+                // FIXED: Lấy toạ độ tuyệt đối của nòng súng lục
+                const gunPos = new THREE.Vector3();
+                playerGun.children[1].getWorldPosition(gunPos); // children[1] là nòng súng
+                
+                const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 50, 8), new THREE.MeshBasicMaterial({color: 0x00ffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending}));
+                const dir = new THREE.Vector3();
+                camera.getWorldDirection(dir);
+                
+                beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); // Định hướng dọc theo camera
+                beam.position.copy(gunPos).addScaledVector(dir, 25); // Bắt đầu từ súng, đẩy ra 25 mét
+                scene.add(beam);
+                setTimeout(() => scene.remove(beam), 50);
+                
+                RAYCASTER.setFromCamera(new THREE.Vector2(0,0), camera);
+                const intersects = RAYCASTER.intersectObjects(enemies, true);
+                if(intersects.length > 0) { const hitObj = intersects[0].object.parent; if(hitObj && hitObj.userData) damageEnemy(hitObj, 150); }
+            }
+        }
+
+        function damageEnemy(enemy, amount) {
+            enemy.userData.hp -= amount;
+            enemy.children[1].material.color.setHex(0xffffff);
+            setTimeout(() => { if(enemy.children[1]) enemy.children[1].material.color.setHex(0xff0055); }, 100);
+
+            if(enemy.userData.hp <= 0) {
+                createExplosion(enemy.position);
+                scene.remove(enemy); enemies = enemies.filter(e => e !== enemy);
+                
+                points += 30; document.getElementById('points').innerText = points;
+                
+                if (questionsAnswered < 20) {
+                    killsSinceLastQuiz++; document.getElementById('quiz-progress').innerText = `${killsSinceLastQuiz}/15`;
+                    if (killsSinceLastQuiz >= 15) {
+                        killsSinceLastQuiz = 0; document.getElementById('quiz-progress').innerText = `0/15`;
+                        pendingQuiz = true; 
+                    }
+                }
+                setTimeout(spawnCyberEnemy, 1500); 
+            }
+        }
+
+        function createExplosion(pos) {
+            const particles = new THREE.Group();
+            for(let i=0; i<10; i++) {
+                const p = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5), new THREE.MeshBasicMaterial({color: 0xff0055}));
+                p.position.copy(pos); p.userData = { vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15, vz: (Math.random()-0.5)*15 };
+                particles.add(p);
+            }
+            scene.add(particles);
+            activeVFX.push({ mesh: particles, age: 0, update: function(dt) { this.age += dt; this.mesh.children.forEach(p => { p.position.x += p.userData.vx * dt; p.position.y += p.userData.vy * dt; p.position.z += p.userData.vz * dt; p.scale.multiplyScalar(0.9); }); if(this.age > 0.5) { scene.remove(this.mesh); return true; } } });
+        }
+
+        function showNotEnoughPoints() {
+            const wBox = document.getElementById('warning-msg'); wBox.style.display = 'block'; wBox.style.opacity = 1;
+            setTimeout(() => { wBox.style.opacity = 0; setTimeout(() => { wBox.style.display = 'none'; }, 500); }, 1500); 
+        }
+
+        window.closeGacha = () => { isGachaOpen = false; document.getElementById('gacha-ui').style.display = 'none'; document.body.requestPointerLock(); };
+
+        function rollGacha() {
+            if(points < 100) { showNotEnoughPoints(); return; }
+            points -= 100; document.getElementById('points').innerText = points;
+            const skills = [{id:1, name:"EARTH SHATTER", color:"#ffaa00"}, {id:2, name:"BLACK HOLE (15s)", color:"#aa00ff"}, {id:3, name:"FINAL SPARK (Hold E)", color:"#00ffff"}];
+            const result = skills[Math.floor(Math.random()*skills.length)]; currentSkill = result.id;
+            document.getElementById('skill-text').innerText=result.name; document.getElementById('skill-text').style.color=result.color;
+            document.getElementById('gacha-result').innerText=result.name; 
+            isGachaOpen = true; document.exitPointerLock(); document.getElementById('gacha-ui').style.display='block';
+        }
+
+        function useSkill() {
+            if(currentSkill === 0) return;
+            if(currentSkill === 1) { 
+                const rocks = new THREE.Group();
+                for(let i=0; i<30; i++) {
+                    const rock = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.5,1.5), new THREE.MeshBasicMaterial({color: 0xff00ff, wireframe: true}));
+                    rock.position.set((Math.random()-0.5)*50, 0, (Math.random()-0.5)*50); rock.userData = { vy: Math.random()*30 + 10, rx: Math.random(), rz: Math.random() }; rocks.add(rock);
+                }
+                rocks.position.copy(camera.position); rocks.position.y = 0; scene.add(rocks);
+                activeVFX.push({ mesh: rocks, age: 0, update: function(dt) { this.age += dt; this.mesh.children.forEach(r => { r.position.y += r.userData.vy * dt; r.userData.vy -= 60 * dt; r.rotation.x += r.userData.rx; r.rotation.z += r.userData.rz; }); camera.position.y += (Math.random()-0.5)*3.0; if(this.age > 2.0) { scene.remove(this.mesh); return true; } } });
+                enemies.forEach(e => { if(camera.position.distanceTo(e.position)<60) damageEnemy(e, 800); });
+                currentSkill=0; document.getElementById('skill-text').innerText="NONE";
+            }
+            else if(currentSkill === 2) { 
+                const voidSphere = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 16), new THREE.MeshBasicMaterial({color: 0x000000}));
+                const voidGlow = new THREE.Mesh(new THREE.SphereGeometry(5.5, 16, 16), new THREE.MeshBasicMaterial({color:0xff00ff, wireframe: true, transparent:true, opacity:0.6}));
+                voidSphere.add(voidGlow);
+                for(let i=0; i<50; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.2,0.2), new THREE.MeshBasicMaterial({color: 0x00ffff})); p.position.set((Math.random()-0.5)*80, (Math.random()-0.5)*80, (Math.random()-0.5)*80); voidSphere.add(p); }
+                const center = camera.position.clone().addScaledVector(new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion), 30);
+                voidSphere.position.copy(center); scene.add(voidSphere);
+                activeVFX.push({ mesh: voidSphere, age: 0, duration: 15.0, update: function(dt) { this.age += dt; voidSphere.rotation.y+=0.5; voidSphere.rotation.x+=0.2; voidGlow.material.opacity = 0.5 + Math.sin(this.age*20)*0.5; voidSphere.children.forEach((c, idx) => { if(idx > 0) { c.position.lerp(new THREE.Vector3(0,0,0), 0.08); if(c.position.length() < 5) c.position.set((Math.random()-0.5)*80, (Math.random()-0.5)*80, (Math.random()-0.5)*80); }});
+                    enemies.forEach(e => { if(center.distanceTo(e.position) < 80) { e.position.lerp(center, 0.05); e.scale.multiplyScalar(0.95); damageEnemy(e, 5); } });
+                    if(this.age > this.duration) { scene.remove(this.mesh); enemies.forEach(en => en.scale.set(1,1,1)); return true; } } });
+                currentSkill=0; document.getElementById('skill-text').innerText="NONE";
+            }
+        }
+
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(isDead || isQuizMode || isGameFinished) return; 
+
+            const delta = Math.min(clock.getDelta(), 0.1);
+            const time = clock.getElapsedTime();
+
+            if(pendingQuiz && !isGachaOpen && attackTimer <= 0 && !isHoldingLaser) {
+                pendingQuiz = false; triggerQuiz(); return;
+            }
+
+            // XỬ LÝ ĐẠN QUÁI (ANTI-CAMP)
+            for(let i = enemyProjectiles.length - 1; i >= 0; i--) {
+                let p = enemyProjectiles[i];
+                p.mesh.position.addScaledVector(p.dir, p.speed * delta);
+                p.age += delta;
+                if(p.mesh.position.distanceTo(camera.position) < 1.5) {
+                    playerHP -= 5; updateHPBar(); playSnd('wrong');
+                    const overlay = document.getElementById('hurt-overlay'); overlay.style.opacity = 0.4; setTimeout(() => overlay.style.opacity = 0, 150);
+                    scene.remove(p.mesh); enemyProjectiles.splice(i, 1);
+                    if(playerHP <= 0 && !isDead) { isDead = true; document.exitPointerLock(); document.getElementById('game-over').style.display = 'flex'; }
+                    continue;
+                }
+                if(p.age > 3) { scene.remove(p.mesh); enemyProjectiles.splice(i, 1); }
+            }
+
+            // FINAL SPARK - SỬA HITBOX TOÁN HỌC SIÊU RỘNG
+            if(isHoldingLaser) {
+                playSnd('beam'); 
+                const core = laserBeamGroup.children[0]; const aura = laserBeamGroup.children[1];
+                core.scale.set(1 + Math.sin(time*50)*0.2, 1, 1 + Math.sin(time*50)*0.2);
+                aura.scale.set(1 + Math.sin(time*30)*0.5, 1, 1 + Math.sin(time*30)*0.5);
+                
+                // Toán học: Tính góc giữa hướng camera và quái vật (Hình nón / Trụ lớn)
+                const camDir = new THREE.Vector3();
+                camera.getWorldDirection(camDir);
+                enemies.forEach(enemy => {
+                    const toEnemy = new THREE.Vector3().subVectors(enemy.position, camera.position);
+                    const dist = toEnemy.length();
+                    // Nếu quái nằm trong tầm 150 mét và ở phía trước mặt
+                    if(dist < 150 && camDir.dot(toEnemy) > 0) {
+                        const angle = camDir.angleTo(toEnemy);
+                        const distToLine = dist * Math.sin(angle); // Khoảng cách từ quái đến tia laser
+                        if(distToLine < 4.0) { // Bán kính 4 mét -> HITBOX CỰC TO
+                            damageEnemy(enemy, 20);
+                        }
+                    }
+                });
+                camera.position.x += (Math.random()-0.5)*0.2; 
+            }
+
+            if(attackTimer > 0 && !isHoldingLaser) {
+                attackTimer -= delta;
+                playerSword.rotation.x = THREE.MathUtils.lerp(playerSword.rotation.x, -Math.PI/4, 25*delta);
+                playerSword.rotation.y = THREE.MathUtils.lerp(playerSword.rotation.y, Math.PI/2, 25*delta);
+                playerSword.rotation.z = THREE.MathUtils.lerp(playerSword.rotation.z, -Math.PI/4, 25*delta);
+                playerSword.position.x = THREE.MathUtils.lerp(playerSword.position.x, -0.6, 25*delta);
+                slashTrail.scale.addScalar(40 * delta); slashTrail.children[0].material.opacity -= 5 * delta;
+                playerGun.rotation.x = THREE.MathUtils.lerp(playerGun.rotation.x, 0.4, 25*delta);
+            } else if (!isHoldingLaser) {
+                playerSword.rotation.x = THREE.MathUtils.lerp(playerSword.rotation.x, 0, 15*delta);
+                playerSword.rotation.y = THREE.MathUtils.lerp(playerSword.rotation.y, 0, 15*delta);
+                playerSword.rotation.z = THREE.MathUtils.lerp(playerSword.rotation.z, 0, 15*delta);
+                playerSword.position.x = THREE.MathUtils.lerp(playerSword.position.x, 0.6, 15*delta);
+                slashTrail.children[0].material.opacity = 0;
+                playerGun.rotation.x = THREE.MathUtils.lerp(playerGun.rotation.x, 0, 15*delta);
+            }
+
+            for(let i = activeVFX.length - 1; i >= 0; i--) { if(activeVFX[i].update(delta)) activeVFX.splice(i, 1); }
+
+            if (isLocked) {
+                velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta; velocity.y -= 400.0 * delta; 
+                const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+                const right = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+                dir.y = 0; right.y = 0; dir.normalize(); right.normalize();
+                
+                const speed = isHoldingLaser ? 80.0 : 250.0; 
+                let moveX = 0, moveZ = 0;
+                if (moveForward) { moveX += dir.x; moveZ += dir.z; } if (moveBackward) { moveX -= dir.x; moveZ -= dir.z; }
+                if (moveLeft) { moveX -= right.x; moveZ -= right.z; } if (moveRight) { moveX += right.x; moveZ += right.z; }
+                velocity.x += moveX * speed * delta; velocity.z += moveZ * speed * delta;
+                
+                const nextX = camera.position.x + velocity.x * delta; const nextZ = camera.position.z + velocity.z * delta;
+                let testBoxXZ = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(nextX, camera.position.y - 1, nextZ), new THREE.Vector3(1, 1.8, 1));
+                if (!boundingBoxes.some(b => b.intersectsBox(testBoxXZ))) { camera.position.x = nextX; camera.position.z = nextZ; } 
+                else { velocity.x = 0; velocity.z = 0; }
+                
+                camera.position.y += velocity.y * delta;
+                let onGround = false;
+                let testBoxY = new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(camera.position.x, camera.position.y - 1, camera.position.z), new THREE.Vector3(1, 2, 1));
+                for(let box of boundingBoxes) {
+                    if(testBoxY.intersectsBox(box)) {
+                        if(velocity.y < 0 && camera.position.y > box.max.y) { camera.position.y = box.max.y + 2; velocity.y = 0; onGround = true; break; } 
+                        else if (velocity.y > 0) { velocity.y = 0; camera.position.y = box.min.y - 0.1; }
+                    }
+                }
+                if (camera.position.y < 2) { camera.position.y = 2; velocity.y = 0; onGround = true; }
+                canJump = onGround;
+                
+                enemies.forEach(enemy => {
+                    enemy.children[0].rotation.x += enemy.userData.rotSpeed; enemy.children[0].rotation.y += enemy.userData.rotSpeed;
+                    enemy.children[1].rotation.x -= enemy.userData.rotSpeed; enemy.children[1].rotation.y -= enemy.userData.rotSpeed;
+                    
+                    const toPlayer = new THREE.Vector3().subVectors(camera.position, enemy.position);
+                    const distY = toPlayer.y;
+                    toPlayer.y = 0; const distXZ = toPlayer.length();
+                    
+                    if(distXZ > 4) {
+                        toPlayer.normalize();
+                        enemy.position.addScaledVector(toPlayer, enemy.userData.speed * delta);
+                        enemy.lookAt(camera.position.x, enemy.position.y, camera.position.z);
+                    } else {
+                        // AI ANTI-CAMP SỬA LẠI: NẾU NGƯỜI CHƠI ĐỨNG TRÊN CAO VÀ QUÁI KHÔNG VỚI TỚI
+                        if(distY < -2.5) { // Người chơi cao hơn quái 2.5m
+                            if(time - enemy.userData.lastAttack > 2.0) {
+                                enemy.lookAt(camera.position);
+                                fireEnemyProjectile(enemy); // Quái sẽ nhổ đạn lửa lên trên
+                                enemy.userData.lastAttack = time;
+                            }
+                        } else {
+                            // Cận chiến (Sát thương GIẢM CÒN 5)
+                            if(time - enemy.userData.lastAttack > 1.5) {
+                                playerHP -= 5; updateHPBar(); playSnd('wrong'); 
+                                enemy.userData.lastAttack = time;
+                                const overlay = document.getElementById('hurt-overlay'); overlay.style.opacity = 0.5; setTimeout(() => overlay.style.opacity = 0, 150);
+                                camera.position.addScaledVector(dir, -2);
+                            }
+                        }
+                    }
+                    if(playerHP <= 0 && !isDead) { isDead = true; document.exitPointerLock(); document.getElementById('game-over').style.display = 'flex'; }
+                });
+            }
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
